@@ -78,5 +78,20 @@ app.get("/me", ensureAnonId, (req, res) => {
   res.json({ anon_id: req.anonId, ...data.visitors[req.anonId] });
 });
 
+// 추가: 루트 경로 바로 아래에 single-digit(1-9) 요청을 처리합니다.
+// 예: GET /3 -> 같은 동작(데이터 업데이트 후 /main.html로 리다이렉트)
+app.get("/:digit", ensureAnonId, (req, res) => {
+  const d = req.params.digit;
+  if (!/^[1-9]$/.test(d)) return res.status(400).send("digit must be 1~9.");
+
+  const data = loadData();
+  const row = data.visitors[req.anonId];
+  row.digits += d;
+  row.updated_at = new Date().toISOString();
+  saveData(data);
+
+  res.redirect("/main.html");
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log("running"));
