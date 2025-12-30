@@ -73,9 +73,10 @@ app.get("/main.html/:digit", ensureAnonId, (req, res) => {
   res.redirect("/main.html");
 });
 
+// 변경: /me에서 현재 사용자 뿐 아니라 모든 방문자 데이터를 반환하도록 수정
 app.get("/me", ensureAnonId, (req, res) => {
   const data = loadData();
-  res.json({ anon_id: req.anonId, ...data.visitors[req.anonId] });
+  res.json({ anon_id: req.anonId, visitors: data.visitors });
 });
 
 // 추가: 루트 경로 바로 아래에 single-digit(1-9) 요청을 처리합니다.
