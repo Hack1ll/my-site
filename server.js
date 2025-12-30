@@ -77,6 +77,4 @@ app.get("/me", ensureAnonId, (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Open: http://localhost:${PORT}/main.html`);
-});
+app.listen(PORT, "0.0.0.0", () => console.log("running"));
