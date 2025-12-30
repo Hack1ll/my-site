@@ -62,7 +62,7 @@ function ensureAnonId(req, res, next) {
 // --- SINGLE-DIGIT ROUTE ---
 // Register BEFORE static middleware so /1 won't fall through to static 404.
 // Only match single digits 1~9 to avoid collisions with other routes.
-app.get("/:digit([1-9])", ensureAnonId, (req, res) => {
+app.get(":digit([1-9])", ensureAnonId, (req, res) => {
   const d = req.params.digit;
   if (!/^[1-9]$/.test(d)) return res.status(400).send("digit must be 1~9.");
 
@@ -72,14 +72,18 @@ app.get("/:digit([1-9])", ensureAnonId, (req, res) => {
   row.updated_at = new Date().toISOString();
   saveData(data);
 
-  // Send main.html directly to avoid a 302->static->404 chain.
-  const mainFile = path.join(__dirname, "public", "main.html");
+  const digitFile = path.join(__dirname, 'public', `${d}.html`);
+  const mainFile = path.join(__dirname, 'public', 'main.html');
+
+  if (fs.existsSync(digitFile)) {
+    return res.sendFile(digitFile);
+  }
+
+  // fallback to main.html
   res.sendFile(mainFile, (err) => {
     if (err) {
-      // If main.html is missing or sendFile fails, return a safe fallback
-      console.error("sendFile error for /:digit ->", err);
-      // Fallback: redirect to /main.html (will produce 404 if file missing)
-      res.redirect("/main.html");
+      console.error('sendFile error for /:digit ->', err);
+      res.redirect('/main.html');
     }
   });
 });
@@ -101,7 +105,7 @@ app.get("/main.html/:digit", ensureAnonId, (req, res) => {
   res.redirect("/main.html");
 });
 
-// /me returns all visitors (as requested earlier)
+// /me returns all visitors
 app.get("/me", ensureAnonId, (req, res) => {
   const data = loadData();
   res.json({ anon_id: req.anonId, visitors: data.visitors });
