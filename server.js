@@ -10,6 +10,8 @@ app.set("trust proxy", 1); // 배포 프록시 환경 대응
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
+app.get("/", (req, res) => res.redirect("/main.html"));
+
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const DATA_FILE = path.join(DATA_DIR, "data.json");
 
