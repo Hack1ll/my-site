@@ -5,7 +5,7 @@ const cookieParser = require("cookie-parser");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
-app.set("trust proxy", 1); // 배포 프록시 환경 대응
+app.set("trust proxy", 1);
 
 app.use(cookieParser());
 
@@ -23,7 +23,6 @@ function loadData() {
   }
 }
 
-// 파일 깨짐 방지: tmp -> rename
 function saveData(data) {
   const tmp = DATA_FILE + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf8");
@@ -36,7 +35,6 @@ function ensureAnonId(req, res, next) {
   if (!anonId) {
     anonId = uuidv4();
     const isProd = process.env.NODE_ENV === "production";
-
     res.cookie("anon_id", anonId, {
       httpOnly: true,
       sameSite: "Lax",
@@ -59,12 +57,14 @@ function ensureAnonId(req, res, next) {
   next();
 }
 
-// --- SINGLE-DIGIT ROUTE ---
-// Register BEFORE static middleware so /1 won't fall through to static 404.
-// Only match single digits 1~9 to avoid collisions with other routes.
-app.get(":digit([1-9])", ensureAnonId, (req, res) => {
+// Serve static files first. If static exists, it'll be served; otherwise fall through to route below.
+app.use(express.static(path.join(__dirname, "public")));
+
+// Single-digit route: matches 1-9. If a static file exists it was already served; here we handle fallback
+// and visitor tracking.
+app.get('/:digit([1-9])', ensureAnonId, (req, res) => {
   const d = req.params.digit;
-  if (!/^[1-9]$/.test(d)) return res.status(400).send("digit must be 1~9.");
+  if (!/^[1-9]$/.test(d)) return res.status(400).send('digit must be 1~9.');
 
   const data = loadData();
   const row = data.visitors[req.anonId];
@@ -73,25 +73,39 @@ app.get(":digit([1-9])", ensureAnonId, (req, res) => {
   saveData(data);
 
   const digitFile = path.join(__dirname, 'public', `${d}.html`);
-  const mainFile = path.join(__dirname, 'public', 'main.html');
-
-  if (fs.existsSync(digitFile)) {
-    return res.sendFile(digitFile);
-  }
-
-  // fallback to main.html
-  res.sendFile(mainFile, (err) => {
-    if (err) {
-      console.error('sendFile error for /:digit ->', err);
-      res.redirect('/main.html');
+  fs.access(digitFile, fs.constants.R_OK, (err) => {
+    if (!err) {
+      return res.sendFile(digitFile);
     }
+
+    // Static file missing => return generated HTML fallback
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${d}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Roboto, "Segoe UI", Arial; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f7fafc; }
+    .card { text-align:center; padding:2rem; border-radius:8px; box-shadow:0 8px 30px rgba(2,6,23,0.08); background:#fff; }
+    .digit { font-size:6rem; font-weight:700; }
+  </style>
+</head>
+<body>
+  <main class="card" role="main" aria-labelledby="title">
+    <h1 id="title">${d}</h1>
+    <div class="digit">${d}</div>
+    <p>This is a generated fallback page for /${d} (static file not found).</p>
+    <p><a href="/main.html">Back to main</a></p>
+  </main>
+</body>
+</html>`;
+
+    res.status(200).type('html').send(html);
   });
 });
 
-// Serve static assets from public after numeric route
-app.use(express.static(path.join(__dirname, "public")));
-
-// Keep existing /main.html/:digit behavior
+// Keep existing main.html/:digit behavior (updates and redirects)
 app.get("/main.html/:digit", ensureAnonId, (req, res) => {
   const d = req.params.digit;
   if (!/^[1-9]$/.test(d)) return res.status(400).send("digit must be 1~9.");
@@ -111,7 +125,7 @@ app.get("/me", ensureAnonId, (req, res) => {
   res.json({ anon_id: req.anonId, visitors: data.visitors });
 });
 
-// Optional: fallback 404 for other routes
+// Fallback 404
 app.use((req, res) => {
   res.status(404).send("Not Found");
 });
