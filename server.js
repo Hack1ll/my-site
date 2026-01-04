@@ -11,6 +11,15 @@ app.use(cookieParser());
 
 app.get("/", (req, res) => res.redirect("/main.html"));
 
+app.get("/", (req, res) => res.redirect("/main.html"));
+app.get("/:digit", (req, res, next) => {
+  const { digit } = req.params;
+  if (/^[1-9]$/.test(digit)) {
+    return res.redirect(`/main.html/${digit}`);
+  }
+  return next();
+});
+
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const DATA_FILE = path.join(DATA_DIR, "data.json");
 
